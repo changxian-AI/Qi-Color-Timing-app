@@ -109,7 +109,7 @@ if st.button("🚀 获取今日指南"):
             
             # 调用模型 (修正了模型名称，GPT写的 2.5 尚不存在)
             response = client.models.generate_content(
-                model="gemini-1.5-flash",
+                model="gemini-1.5-flash-002",
                 contents=full_prompt
             )
             
