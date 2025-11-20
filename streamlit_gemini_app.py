@@ -98,7 +98,7 @@ if st.button("🚀 获取今日指南"):
         genai.configure(api_key=api_key)
         
         # 初始化模型 (这里使用最标准的名称，稳定版SDK一定能认)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-001')
         
         with st.spinner('正在排盘分析中...'):
             # 构造提示词
