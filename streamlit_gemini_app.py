@@ -8,139 +8,162 @@ from lunar_python import Solar
 
 # ------- 1. 页面配置 -------
 st.set_page_config(
-    page_title="气色·能量日历",
-    page_icon="🔮",
+    page_title="气色·能量穿搭指南",
+    page_icon="👗",
     layout="centered"
 )
 
 # 初始化 Session State
 if 'page' not in st.session_state:
     st.session_state.page = 'daily'
-if 'bazi_report' not in st.session_state:
-    st.session_state.bazi_report = None
+if 'forecast_type' not in st.session_state:
+    st.session_state.forecast_type = None # 'month' or 'year'
+if 'forecast_result' not in st.session_state:
+    st.session_state.forecast_result = None
 
-# ------- 2. UI 样式 (Notion 风格 + 对齐优化) -------
+# ------- 2. 时尚风格 UI (Fashion UI) -------
 st.markdown("""
 <style>
-    /* 全局清爽白底 */
+    /* 全局白底，字体深灰 */
     .stApp {
         background-color: #FFFFFF;
         color: #333;
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     }
     
-    /* 按钮优化 */
+    /* 主按钮：渐变紫 */
     div.stButton > button {
         width: 100%;
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
         padding: 12px 24px;
-        border-radius: 8px;
+        border-radius: 30px; /* 圆润时尚感 */
         font-size: 16px;
         font-weight: 600;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-        transition: all 0.2s;
+        box-shadow: 0 4px 15px rgba(118, 75, 162, 0.3);
+        transition: transform 0.2s;
     }
-    div.stButton > button:hover { transform: translateY(-1px); opacity: 0.9; }
-    
-    /* 次要按钮 */
-    .secondary-btn button {
-        background: transparent;
-        border: 1px solid #764ba2;
-        color: #764ba2;
-        box-shadow: none;
+    div.stButton > button:hover { transform: scale(1.02); }
+
+    /* 支付/解锁按钮 (金色系) */
+    .premium-btn button {
+        background: linear-gradient(135deg, #F2994A 0%, #F2C94C 100%);
+        color: #333;
+        box-shadow: 0 4px 15px rgba(242, 201, 76, 0.3);
     }
 
-    /* --- 核心组件：能量对撞条 (Me vs Today) --- */
-    .battle-bar {
+    /* --- 核心组件：OOTD Hero Card (杂志封面风) --- */
+    .ootd-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+        overflow: hidden;
+        border: 1px solid #eee;
+    }
+    .ootd-header {
+        background: #F8F9FA;
+        padding: 15px 20px;
+        border-bottom: 1px solid #eee;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .ootd-body {
+        padding: 25px;
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        background-color: #F8F9FA;
-        border: 1px solid #E9ECEF;
-        border-radius: 12px;
-        padding: 15px 20px;
-        margin-bottom: 20px;
     }
-    .battle-side {
-        text-align: center;
-        width: 30%;
+    .color-swatch {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        margin-right: 20px;
+        flex-shrink: 0;
+        border: 3px solid #fff;
     }
-    .battle-center {
-        text-align: center;
-        width: 40%;
-        color: #666;
-        font-size: 14px;
-        font-weight: bold;
-        border-bottom: 2px solid #E9ECEF;
-        padding-bottom: 5px;
+    .ootd-details {
+        flex-grow: 1;
     }
-    .bazi-char { font-size: 24px; font-weight: bold; color: #333; display: block; }
-    .bazi-desc { font-size: 12px; color: #888; background: #eee; padding: 2px 6px; border-radius: 4px; }
-    
-    /* 幸运色卡片 */
-    .lucky-card {
-        background-color: #FFF;
-        border: 1px solid #E0E0E0;
-        border-left: 8px solid #333; /* 动态颜色 */
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.03);
-        margin-bottom: 20px;
+    .ootd-title { font-size: 22px; font-weight: 800; color: #333; margin-bottom: 8px; }
+    .ootd-desc { color: #555; font-size: 15px; line-height: 1.6; }
+    .ootd-tags { margin-top: 10px; }
+    .tag { 
+        background: #eee; color: #555; padding: 4px 10px; 
+        border-radius: 4px; font-size: 12px; margin-right: 5px; display: inline-block;
     }
 
-    /* --- 对齐布局组件 --- */
-    .grid-box {
-        padding: 15px;
-        border-radius: 8px;
-        height: 100%; /* 强制等高 */
+    /* 能量对撞条 (简约版) */
+    .energy-bar {
         display: flex;
-        flex-direction: column;
-        justify-content: flex-start;
+        justify-content: space-between;
+        align-items: center;
+        background: #F4F6F7;
+        border-radius: 8px;
+        padding: 10px 15px;
+        margin-bottom: 20px;
+        font-size: 13px;
+        color: #666;
     }
     
-    /* 颜色定义 */
-    .bg-blue { background-color: #E3F2FD; color: #1565C0; }   /* 黄金时辰 */
-    .bg-green { background-color: #E8F5E9; color: #2E7D32; }  /* 宜 */
-    .bg-red { background-color: #FFEBEE; color: #C62828; }    /* 忌 */
-    .bg-gold { background-color: #FFF8E1; color: #F57F17; border: 1px solid #FFECB3; } /* 锦囊 */
-
-    /* 评分项 */
-    .score-item { text-align: center; }
-    .score-val { font-size: 16px; color: #FBC02D; letter-spacing: 1px; }
-    .score-label { font-size: 12px; color: #999; }
+    /* 宫格布局 */
+    .grid-item {
+        background: #FAFAFA;
+        padding: 15px;
+        border-radius: 12px;
+        height: 100%;
+        border: 1px solid #eee;
+    }
+    
+    /* 标题 */
+    h3 { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #333; }
 
 </style>
 """, unsafe_allow_html=True)
 
 # ------- 3. 逻辑部分 -------
 
-# Prompt 更新：增加今日五行字段，强调对比关系
+# OOTD 强化版 Prompt
 DAILY_PROMPT = """
-Role: 现代命理策略顾问。
-Goal: 输出 JSON。
+Role: 顶级时尚穿搭顾问 & 命理师。
+Goal: 基于【日柱生克】+【天气】+【场景】，输出 OOTD 建议。
+
 Logic:
-1. 场景：工作日(效率) vs 周末(生活)。
-2. **核心分析：** 必须解释【用户日主】与【今日干支】的生克关系（如：甲木克戊土，为偏财）。
-3. 必须提供今日干支的五行属性。
+1. **能量计算：** 分析日主与今日干支的关系（如：财旺需比劫，印旺需食伤）。
+2. **天气结合：** 
+   - 晴天：推荐透气、亮色。
+   - 雨/雪：推荐防水材质、靴子、深色防脏。
+   - 阴/风：推荐风衣、叠穿。
+3. **穿搭建议 (OOTD)：** 必须包含【主色】、【单品名】、【材质】、【配饰】。
 
 Output Format (Strict JSON):
 {
-    "user": {"gan": "辛", "element": "金", "label": "我 (日主)"}, 
-    "today": {"ganzhi": "甲午", "element": "木火", "relation_desc": "金克木，今日是您的【正财日】"},
-    "scores": {"money": 4, "career": 3, "love": 5, "energy": 3},
-    "lucky_color": {"main": "白色", "hex": "#FFFFFF", "reason": "财多身弱，需金帮身..."},
-    "golden_hour": {"time": "15:00-17:00 (申时)", "action": "头脑风暴"},
-    "guide": {"lucky": "请客吃饭", "taboo": "与长辈顶撞"},
-    "advice": "详细的行动锦囊...",
-    "quote": "金句"
+    "energy_analysis": "今日金水旺，您是木命，水多木漂，需土制水（黄色/卡其色）或火暖局...",
+    "lucky_color": {"main": "卡其色", "hex": "#F0E68C"},
+    "ootd": {
+        "title": "卡其色风衣 · 稳重气场",
+        "items": ["卡其色防水风衣", "深棕色羊毛衫", "切尔西靴"],
+        "style_desc": "今日雨水偏多，五行水旺。建议外穿防水材质的风衣（土克水），内搭保暖羊毛。既实用又符合命理开运逻辑。",
+        "tags": ["防水", "英伦风", "土系能量"]
+    },
+    "scores": {"money": 4, "love": 3, "energy": 3},
+    "golden_hour": "13:00-15:00 (未时)",
+    "guide": {"lucky": "整理工位", "taboo": "穿白色鞋子(易脏/泄气)"}
 }
 """
 
-FULL_ANALYSIS_PROMPT = """
+# 运势预测 Prompt
+FORECAST_PROMPT = """
 Role: 资深命理分析师。
-Task: 自动校正真太阳时，排盘，深度批断。
-Output: Markdown格式报告。
+Goal: 生成【本月】或【本年】的运势预测。
+Input: 用户八字、预测周期（月/年）。
+Output: 清晰的 Markdown，包含：
+1. 核心关键词（如：动荡、桃花、破财）。
+2. 事业/财运/感情/健康 四维深度解析。
+3. 重点月份/日期提醒。
 """
 
 def get_bazi_simple(date_obj):
@@ -148,8 +171,10 @@ def get_bazi_simple(date_obj):
     lunar = solar.getLunar()
     return {"full": f"{lunar.getDayInGanZhi()}", "gan": lunar.getDayGan()}
 
-def switch_page(page_name):
+def switch_page(page_name, f_type=None):
     st.session_state.page = page_name
+    if f_type:
+        st.session_state.forecast_type = f_type
     st.rerun()
 
 # ------- 4. 页面构建 -------
@@ -160,31 +185,34 @@ with st.sidebar:
     env_key = os.environ.get("GEMINI_API_KEY")
     if env_key:
         api_key = env_key
-        st.success("✅ API Key 已加载")
+        st.success("✅ 密钥已加载")
     else:
         api_key = st.text_input("输入 API Key", type="password")
     
     st.markdown("---")
     if st.button("🏠 返回首页"):
-        st.session_state.bazi_report = None
+        st.session_state.forecast_result = None
         switch_page('daily')
 
-# ================= 页面 1: 首页 (Daily) =================
+# ================= 页面 1: 首页 (OOTD) =================
 if st.session_state.page == 'daily':
-    st.title("气色 · 全场景能量日历")
-    st.caption("Powered by Gemini 2.5 + LunarPython")
+    st.title("气色 · 能量穿搭指南")
+    st.caption("Based on Bazi & Weather")
     
-    col1, col2 = st.columns(2)
+    # 输入区
+    col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
         dob = st.date_input("您的生日", datetime.date(1984, 8, 25))
     with col2:
-        today = st.date_input("查看日期", datetime.date.today())
+        today = st.date_input("出行日期", datetime.date.today())
+    with col3:
+        weather = st.selectbox("天气", ["☀️ 晴朗", "☁️ 多云", "🌧️ 下雨", "❄️ 下雪", "💨 大风"])
     
     st.markdown("<br>", unsafe_allow_html=True)
 
-    if st.button("🚀 获取今日指引"):
+    if st.button("👗 生成今日穿搭"):
         if not api_key:
-            st.error("请先配置 API Key")
+            st.error("请配置 API Key")
             st.stop()
             
         user_bazi = get_bazi_simple(dob)
@@ -194,149 +222,135 @@ if st.session_state.page == 'daily':
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-2.5-flash')
             
-            with st.spinner('正在分析五行磁场...'):
+            with st.spinner('正在匹配五行与天气数据...'):
                 prompt = f"""
                 {DAILY_PROMPT}
                 用户日柱：{user_bazi['full']}
                 今日流日：{today_bazi['full']}
+                今日天气：{weather}
                 """
                 response = model.generate_content(prompt, generation_config={"response_mime_type": "application/json"})
                 data = json.loads(response.text)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
 
-                # ---- 1. 能量对撞条 (Me vs Today) ----
-                # 这是一个横向的 Flex 布局，左边是我，右边是天，中间是关系
-                u = data['user']
-                t = data['today']
-                
+                # ---- 1. 能量分析条 ----
                 st.markdown(f"""
-                <div class="battle-bar">
-                    <div class="battle-side">
-                        <span class="bazi-desc">{u['label']}</span>
-                        <span class="bazi-char">{u['gan']}</span>
-                        <span style="color:#999; font-size:12px;">五行属{u['element']}</span>
-                    </div>
-                    <div class="battle-center">
-                        ⚡ {t['relation_desc']} ⚡
-                    </div>
-                    <div class="battle-side">
-                        <span class="bazi-desc">今日能量</span>
-                        <span class="bazi-char">{t['ganzhi']}</span>
-                        <span style="color:#999; font-size:12px;">五行属{t['element']}</span>
-                    </div>
+                <div class="energy-bar">
+                    <span>👤 <b>我 ({user_bazi['gan']})</b></span>
+                    <span style="font-size:10px;">VS</span>
+                    <span>📅 <b>今日 ({today_bazi['full']})</b></span>
+                    <span style="color:#333; font-weight:bold;">{data['energy_analysis'][:20]}...</span>
                 </div>
                 """, unsafe_allow_html=True)
+
+                # ---- 2. OOTD Hero Card (核心亮点) ----
+                ootd = data['ootd']
+                color = data['lucky_color']
+                tags_html = "".join([f'<span class="tag">#{t}</span>' for t in ootd['tags']])
                 
-                # ---- 2. 幸运色卡片 ----
-                lucky = data['lucky_color']
                 st.markdown(f"""
-                <div class="lucky-card" style="border-left-color: {lucky['hex']};">
-                    <div style="font-size: 20px; font-weight: bold; color: #333; display: flex; align-items: center;">
-                        👕 今日幸运色：{lucky['main']}
+                <div class="ootd-card">
+                    <div class="ootd-header">
+                        <span style="font-weight:bold; color:#666;">⚡ 今日能量战袍</span>
+                        <span style="font-size:14px;">{weather}</span>
                     </div>
-                    <div style="margin-top: 8px; color: #555; line-height: 1.5;">
-                        {lucky['reason']}
+                    <div class="ootd-body">
+                        <div class="color-swatch" style="background-color: {color['hex']};"></div>
+                        <div class="ootd-details">
+                            <div class="ootd-title">{ootd['title']}</div>
+                            <div class="ootd-desc">{ootd['style_desc']}</div>
+                            <div style="margin-top:10px; font-size:14px;">
+                                <b>推荐单品：</b> {", ".join(ootd['items'])}
+                            </div>
+                            <div class="ootd-tags">
+                                {tags_html}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # ---- 3. 评分雷达 ----
-                c1, c2, c3, c4 = st.columns(4)
-                scores = data['scores']
-                def render_score(col, label, val):
-                    col.markdown(f"""<div class="score-item"><div class="score-label">{label}</div><div class="score-val">{'★'*val}</div></div>""", unsafe_allow_html=True)
+                # ---- 3. 辅助信息 (宫格布局) ----
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    st.markdown(f"""
+                    <div class="grid-item" style="background:#E3F2FD; color:#1565C0; text-align:center;">
+                        <div style="font-size:12px; opacity:0.8;">黄金时辰</div>
+                        <div style="font-weight:bold; margin-top:5px;">{data['golden_hour'].split(' ')[0]}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with c2:
+                    st.markdown(f"""
+                    <div class="grid-item" style="background:#E8F5E9; color:#2E7D32; text-align:center;">
+                        <div style="font-size:12px; opacity:0.8;">宜</div>
+                        <div style="font-weight:bold; margin-top:5px;">{data['guide']['lucky']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with c3:
+                    st.markdown(f"""
+                    <div class="grid-item" style="background:#FFEBEE; color:#C62828; text-align:center;">
+                        <div style="font-size:12px; opacity:0.8;">忌</div>
+                        <div style="font-weight:bold; margin-top:5px;">{data['guide']['taboo']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                 
-                render_score(c1, "财运", scores['money'])
-                render_score(c2, "事业", scores['career'])
-                render_score(c3, "人缘", scores['love'])
-                render_score(c4, "状态", scores['energy'])
-                
+                # ---- 4. 付费/高级功能钩子 (Funnel) ----
                 st.markdown("---")
-
-                # ---- 4. 行动指南 (严格对齐布局) ----
+                st.markdown("### 🔓 解锁更多运势")
                 
-                # 第一行：黄金时辰 (通栏)
-                gh = data['golden_hour']
-                st.markdown(f"""
-                <div class="grid-box bg-blue" style="margin-bottom: 15px;">
-                    <span style="font-size:18px;">⏰ 黄金时辰：{gh['time']}</span><br>
-                    <span style="opacity:0.8; font-size:14px;">宜：{gh['action']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # 第二行：宜 vs 忌 (两列等宽等高)
-                col_l, col_r = st.columns(2)
-                with col_l:
-                    st.markdown(f"""<div class="grid-box bg-green">✅ 宜：{data['guide']['lucky']}</div>""", unsafe_allow_html=True)
-                with col_r:
-                    st.markdown(f"""<div class="grid-box bg-red">🚫 忌：{data['guide']['taboo']}</div>""", unsafe_allow_html=True)
-
-                # 第三行：锦囊 (通栏，放在最下面，作为总结)
-                st.markdown(f"""
-                <div class="grid-box bg-gold" style="margin-top: 15px;">
-                    <span style="font-size:16px;">💡 <b>锦囊：</b>{data['advice']}</span>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # ---- 5. 金句 & 导流 ----
-                st.markdown(f"""
-                <div style="text-align:center; margin-top:30px; color:#888; font-style:italic;">
-                    “ {data['quote']} ”
-                </div>
-                """, unsafe_allow_html=True)
+                col_m, col_y = st.columns(2)
                 
-                st.markdown("---")
-                st.markdown('<div class="secondary-btn">', unsafe_allow_html=True)
-                if st.button("🗝 解锁真太阳时 · 深度排盘 →"):
-                    switch_page('full_analysis')
-                st.markdown('</div>', unsafe_allow_html=True)
+                # 模拟付费按钮
+                with col_m:
+                    st.markdown('<div class="premium-btn">', unsafe_allow_html=True)
+                    if st.button("📅 查看本月运势 (Premium)"):
+                         switch_page('forecast', 'month')
+                    st.markdown('</div>', unsafe_allow_html=True)
+                    
+                with col_y:
+                    st.markdown('<div class="premium-btn">', unsafe_allow_html=True)
+                    if st.button("📜 查看2025流年 (Premium)"):
+                         switch_page('forecast', 'year')
+                    st.markdown('</div>', unsafe_allow_html=True)
 
         except Exception as e:
             st.error(f"连接中断: {e}")
 
-# ================= 页面 2: 深度分析 (Full) =================
-elif st.session_state.page == 'full_analysis':
-    st.title("🗝 个人命盘全解")
-    st.caption("AI 深度批断 · 真太阳时校正")
+# ================= 页面 2: 运势预测 (Premium Mockup) =================
+elif st.session_state.page == 'forecast':
+    f_type = st.session_state.forecast_type
+    title = "本月流月运势" if f_type == 'month' else "2025 流年运势"
     
-    # 输入卡片
-    st.markdown('<div class="info-card" style="background:#f8f9fa; padding:20px; border-radius:12px; border:1px solid #eee;">', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        b_date = st.date_input("出生日期", datetime.date(1984, 8, 25))
-    with col2:
-        b_time = st.time_input("出生时间", datetime.time(12, 00))
+    st.title(f"🔒 {title}")
+    st.caption("深度命理推演 · 付费专享内容")
     
-    b_city = st.text_input("出生城市 (用于经纬度校正)", "上海")
-    st.caption("⚠️ 系统将根据城市自动计算经度差，修正为真太阳时。")
-    
+    # 输入再次确认
+    st.markdown('<div class="grid-item">', unsafe_allow_html=True)
+    dob = st.date_input("确认您的生日", datetime.date(1984, 8, 25))
+    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
-    
-    if st.button("🚀 开始排盘推演"):
-        if not b_city or not api_key:
-            st.error("请填写城市和 API Key")
-            st.stop()
 
+    # 这里可以加一个模拟的“支付墙”或者直接生成
+    if st.button(f"🚀 开始推演 {title}"):
         try:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-2.5-flash')
             
-            with st.spinner('正在进行天文计算与命理推演...'):
+            with st.spinner('正在排布命盘与大运流年...'):
                 prompt = f"""
-                {FULL_ANALYSIS_PROMPT}
-                出生日期：{b_date}
-                出生时间：{b_time}
-                出生城市：{b_city}
+                {FORECAST_PROMPT}
+                预测类型：{title}
+                用户生日：{dob}
                 """
                 response = model.generate_content(prompt)
-                st.session_state.bazi_report = response.text
+                st.session_state.forecast_result = response.text
                 st.rerun()
-
         except Exception as e:
             st.error(f"推演失败: {e}")
-    st.markdown('</div>', unsafe_allow_html=True)
 
-    if st.session_state.bazi_report:
+    if st.session_state.forecast_result:
         st.markdown("---")
-        st.markdown(st.session_state.bazi_report)
+        st.markdown('<div class="grid-item" style="background:#fff;">', unsafe_allow_html=True)
+        st.markdown(st.session_state.forecast_result)
+        st.markdown('</div>', unsafe_allow_html=True)
