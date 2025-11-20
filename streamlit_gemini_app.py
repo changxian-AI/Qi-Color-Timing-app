@@ -6,14 +6,14 @@ import re
 import google.generativeai as genai
 from lunar_python import Solar
 
-# ------- 1. 页面配置 (开启宽屏以适配炫酷背景) -------
+# ------- 1. 页面配置 -------
 st.set_page_config(
     page_title="气色·能量日历 Pro",
     page_icon="🔮",
     layout="centered"
 )
 
-# ------- 2. 炫酷 UI 注入 (赛博玄学风) -------
+# ------- 2. 炫酷 UI (保持不变) -------
 st.markdown("""
 <style>
     /* 全局背景：深邃星空紫 */
@@ -27,7 +27,7 @@ st.markdown("""
         color: #e0e0e0 !important;
     }
     
-    /* 按钮特效：霓虹流光 */
+    /* 按钮特效 */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
@@ -44,7 +44,7 @@ st.markdown("""
         box-shadow: 0 0 25px rgba(255, 0, 204, 0.8);
     }
 
-    /* 通用毛玻璃卡片 */
+    /* 毛玻璃卡片 */
     .glass-card {
         background: rgba(255, 255, 255, 0.1);
         backdrop-filter: blur(10px);
@@ -82,19 +82,14 @@ st.markdown("""
         margin-bottom: 10px;
     }
 
-    /* 宜忌对决 */
-    .action-card {
-        padding: 15px;
-        border-radius: 12px;
-        text-align: center;
-        height: 100%;
-    }
+    /* 宜忌 */
+    .action-card { padding: 15px; border-radius: 12px; text-align: center; height: 100%; }
     .lucky-bg { background: linear-gradient(135deg, rgba(39, 174, 96, 0.2), rgba(39, 174, 96, 0.4)); border: 1px solid #27ae60; }
     .taboo-bg { background: linear-gradient(135deg, rgba(192, 57, 43, 0.2), rgba(192, 57, 43, 0.4)); border: 1px solid #c0392b; }
     .act-title { font-size: 14px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
     .act-content { font-size: 18px; font-weight: bold; margin-top: 8px; }
 
-    /* 黄金时辰条 */
+    /* 黄金时辰 */
     .time-bar {
         background: linear-gradient(90deg, #F2994A, #F2C94C);
         color: #333;
@@ -108,22 +103,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ------- 3. 核心逻辑：Prompt 升级 -------
+# ------- 3. 核心逻辑：Prompt -------
 SYSTEM_PROMPT = """
 Role: 你是一位神秘、毒舌且精准的“赛博命理师”。
-Goal: 基于用户八字和流日，提供【四维评分】、【黄金时辰】、【幸运色】及【宜忌指南】。
+Goal: 基于用户八字和流日，提供评分、时辰、颜色及建议。
 
 Logic Rules:
 1. **场景判断：** 工作日侧重搞钱/升职，周末侧重桃花/放松。
-2. **生克建议：** 必须基于五行生克（如：官杀重用印化解）。
-3. **黄金时辰：** 必须给出一个具体的时辰（如：未时 13:00-15:00），并说明适合做什么。
-4. **四维评分 (1-5星)：** 
-   - 💰 财运 (Money)
-   - 💼 事业 (Career)
-   - 🌸 桃花 (Love) - *必须独立评分*
-   - 🔋 能量 (Health/Energy)
+2. **生克建议：** 基于五行生克。
+3. **四维评分 (1-5星)：** 财运(money), 事业(career), 桃花(love), 能量(energy)。
 
-Output Format (Strict JSON):
+Output Format (JSON Only):
 {
     "user_info": "您的日柱：[日柱] ([五行])",
     "scores": {
@@ -133,20 +123,20 @@ Output Format (Strict JSON):
         "energy": 3
     },
     "lucky_color": {
-        "main": "建议颜色名称",
-        "hex": "#颜色代码",
-        "reason": "简短的命理理由"
+        "main": "颜色名",
+        "hex": "#HEX代码",
+        "reason": "理由"
     },
     "golden_hour": {
-        "time": "未时 (13:00 - 15:00)",
-        "action": "适合做的事情 (如: 约会/谈判)"
+        "time": "时辰 (如: 未时 13:00-15:00)",
+        "action": "宜做之事"
     },
     "guide": {
-        "lucky": "宜：具体事项 (如: 喝冰美式)",
-        "taboo": "忌：具体事项 (如: 穿绿帽子)"
+        "lucky": "宜：具体事项",
+        "taboo": "忌：具体事项"
     },
-    "advice": "一句具体的转运建议",
-    "quote": "一句神秘的玄学金句"
+    "advice": "具体建议",
+    "quote": "玄学金句"
 }
 """
 
@@ -173,7 +163,7 @@ def get_day_type(date_obj):
 st.title("🔮 气色·能量日历 Pro")
 st.caption("Cyber-Metaphysics Energy Guide")
 
-# 侧边栏 (暗黑风格适配)
+# 侧边栏
 with st.sidebar:
     st.header("⚙️ 命理中枢")
     env_key = os.environ.get("GEMINI_API_KEY")
@@ -214,37 +204,40 @@ if st.button("⚡️ 开启今日能量场"):
             1. 用户日柱：{user_bazi['day_gz']} (天干: {user_bazi['day_gan']})
             2. 今日日期：{today_bazi['year_gz']}年 {today_bazi['month_gz']}月 {today_bazi['day_gz']}日
             3. 场景设定：{day_context}
-            请严格生成JSON。
             """
             
-            response = model.generate_content(full_prompt)
-            clean_json = re.sub(r"```json\s*|\s*```", "", response.text).strip()
-            data = json.loads(clean_json)
-
-            # ------- 结果展示 (赛博风格) -------
+            # ★★★ 核心修复：强制要求返回 JSON 格式 ★★★
+            response = model.generate_content(
+                full_prompt,
+                generation_config={"response_mime_type": "application/json"}
+            )
             
-            # 1. 四维评分系统 (使用自定义 CSS 渲染)
+            # 解析 JSON
+            data = json.loads(response.text)
+
+            # ------- 结果展示 -------
+            
+            # 1. 四维评分
             st.markdown("### 📊 今日运势雷达")
             c1, c2, c3, c4 = st.columns(4)
             scores = data['scores']
             
-            # 渲染评分小球
             def render_score(col, label, val, icon):
                 with col:
                     st.markdown(f"""
                     <div class="score-container">
                         <div style="font-size:24px;">{icon}</div>
-                        <div class="score-val">{"⚡" * val}</div>
+                        <div class="score-val">{"⚡" * int(val)}</div>
                         <div class="score-label">{label}</div>
                     </div>
                     """, unsafe_allow_html=True)
 
             render_score(c1, "财运", scores['money'], "💰")
             render_score(c2, "事业", scores['career'], "💼")
-            render_score(c3, "桃花", scores['love'], "🌸") # 新增桃花
+            render_score(c3, "桃花", scores['love'], "🌸")
             render_score(c4, "能量", scores['energy'], "🔋")
 
-            # 2. 幸运色与 OOTD (毛玻璃卡片)
+            # 2. 幸运色
             st.markdown("<br>", unsafe_allow_html=True)
             lucky = data['lucky_color']
             st.markdown(f"""
@@ -253,7 +246,7 @@ if st.button("⚡️ 开启今日能量场"):
                     <span style="font-size: 20px; margin-right: 10px;">👕</span>
                     <span style="font-weight: bold; font-size: 18px;">幸运穿搭 OOTD</span>
                 </div>
-                <div class="color-box" style="background-color: {lucky['hex']}; color: {'#000' if lucky['hex'] in ['#FFFFFF', '#FFF'] else '#FFF'}">
+                <div class="color-box" style="background-color: {lucky['hex']}; color: {'#000' if lucky['hex'].upper() in ['#FFFFFF', '#FFF'] else '#FFF'}">
                     {lucky['main']}
                 </div>
                 <div style="font-size: 14px; opacity: 0.8; line-height: 1.6;">
@@ -263,7 +256,7 @@ if st.button("⚡️ 开启今日能量场"):
             </div>
             """, unsafe_allow_html=True)
 
-            # 3. 黄金时辰 (高亮条)
+            # 3. 黄金时辰
             gh = data.get('golden_hour', {'time': '未时', 'action': '摸鱼'})
             st.markdown(f"""
             <div class="time-bar">
@@ -272,7 +265,7 @@ if st.button("⚡️ 开启今日能量场"):
             <br>
             """, unsafe_allow_html=True)
 
-            # 4. 宜忌对决 (左右护法)
+            # 4. 宜忌对决
             col_l, col_r = st.columns(2)
             with col_l:
                 st.markdown(f"""
@@ -289,7 +282,7 @@ if st.button("⚡️ 开启今日能量场"):
                 </div>
                 """, unsafe_allow_html=True)
 
-            # 5. 锦囊与金句
+            # 5. 锦囊
             st.markdown(f"""
             <div style="text-align: center; margin-top: 30px; padding: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
                 <p style="font-size: 16px; color: #F2C94C;">📜 <b>锦囊：</b>{data['advice']}</p>
@@ -299,4 +292,5 @@ if st.button("⚡️ 开启今日能量场"):
 
     except Exception as e:
         st.error("🌌 宇宙信号干扰，请重试...")
-        st.error(f"Debug: {e}")
+        # 调试模式下打印原始数据，方便看错哪了
+        st.code(f"Error: {e}")
