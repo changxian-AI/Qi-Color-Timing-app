@@ -6,85 +6,151 @@ import re
 import google.generativeai as genai
 from lunar_python import Solar
 
-# ------- 1. 页面配置 -------
+# ------- 1. 页面配置 (开启宽屏以适配炫酷背景) -------
 st.set_page_config(
-    page_title="气色·能量日历 v1.5",
-    page_icon="⚡️",
+    page_title="气色·能量日历 Pro",
+    page_icon="🔮",
     layout="centered"
 )
 
-# ------- 自定义样式 (更潮一点) -------
+# ------- 2. 炫酷 UI 注入 (赛博玄学风) -------
 st.markdown("""
 <style>
+    /* 全局背景：深邃星空紫 */
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        color: #fff;
+    }
+    
+    /* 输入框美化 */
+    .stDateInput > label, .stTextInput > label {
+        color: #e0e0e0 !important;
+    }
+    
+    /* 按钮特效：霓虹流光 */
     .stButton>button {
         width: 100%;
         border-radius: 12px;
         height: 3.5em;
-        font-weight: 700;
-        background: linear-gradient(90deg, #8E44AD 0%, #3498DB 100%);
+        background: linear-gradient(90deg, #FF00CC, #333399);
         color: white;
+        font-weight: bold;
         border: none;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        box-shadow: 0 0 15px rgba(255, 0, 204, 0.5);
+        transition: all 0.3s ease;
     }
-    .card {
-        background: white;
+    .stButton>button:hover {
+        transform: scale(1.02);
+        box-shadow: 0 0 25px rgba(255, 0, 204, 0.8);
+    }
+
+    /* 通用毛玻璃卡片 */
+    .glass-card {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
         padding: 20px;
-        border-radius: 15px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.05);
         margin-bottom: 20px;
-        border: 1px solid #eee;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
-    .score-box {
-        text-align: center;
+
+    /* 评分球 */
+    .score-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
         padding: 10px;
-        background: #f8f9fa;
-        border-radius: 10px;
+        border: 1px solid rgba(255,255,255,0.05);
     }
-    .score-num { font-size: 24px; font-weight: bold; display: block; }
-    .score-label { font-size: 12px; color: #666; }
-    .taboo { color: #e74c3c; font-weight: bold; }
-    .lucky { color: #27ae60; font-weight: bold; }
+    .score-val { font-size: 20px; font-weight: bold; color: #FFD700; }
+    .score-label { font-size: 12px; color: #aaa; margin-top: 4px; }
+
+    /* 幸运色卡片 */
+    .color-box {
+        height: 80px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        margin-bottom: 10px;
+    }
+
+    /* 宜忌对决 */
+    .action-card {
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+        height: 100%;
+    }
+    .lucky-bg { background: linear-gradient(135deg, rgba(39, 174, 96, 0.2), rgba(39, 174, 96, 0.4)); border: 1px solid #27ae60; }
+    .taboo-bg { background: linear-gradient(135deg, rgba(192, 57, 43, 0.2), rgba(192, 57, 43, 0.4)); border: 1px solid #c0392b; }
+    .act-title { font-size: 14px; opacity: 0.8; text-transform: uppercase; letter-spacing: 1px; }
+    .act-content { font-size: 18px; font-weight: bold; margin-top: 8px; }
+
+    /* 黄金时辰条 */
+    .time-bar {
+        background: linear-gradient(90deg, #F2994A, #F2C94C);
+        color: #333;
+        padding: 10px 20px;
+        border-radius: 50px;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 10px;
+        box-shadow: 0 0 15px rgba(242, 201, 76, 0.4);
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ------- 2. 核心逻辑：命理师的大脑 (升级版) -------
+# ------- 3. 核心逻辑：Prompt 升级 -------
 SYSTEM_PROMPT = """
-Role: 你是一位精通八字命理、擅长把握人性的“毒舌”运势顾问。
-Goal: 基于用户日柱和流日，根据【当前是工作日还是周末】，提供极具洞察力的运势评分、穿搭建议和宜忌指南。
+Role: 你是一位神秘、毒舌且精准的“赛博命理师”。
+Goal: 基于用户八字和流日，提供【四维评分】、【黄金时辰】、【幸运色】及【宜忌指南】。
 
 Logic Rules:
-1. **场景判断：**
-   - 若系统提示【工作日】：聚焦职场、效率、搞钱、防小人、向上管理。
-   - 若系统提示【周末】：聚焦桃花、约会、家庭、休息、社死瞬间、吃喝玩乐。
-2. **生克关系与建议：**
-   - 官杀重：压力大，建议用“印”化解（穿生身之色，多睡觉/读书）。
-   - 食伤重：想发泄，建议用“财”引流（搞钱/购物）或“印”克制（闭嘴）。
-   - 财星重：欲望强，建议“比劫”帮身（找朋友/AA制）。
-3. **评分系统：** 请给出 财运、事业(或桃花)、健康 三个维度的 1-5 星评分。
+1. **场景判断：** 工作日侧重搞钱/升职，周末侧重桃花/放松。
+2. **生克建议：** 必须基于五行生克（如：官杀重用印化解）。
+3. **黄金时辰：** 必须给出一个具体的时辰（如：未时 13:00-15:00），并说明适合做什么。
+4. **四维评分 (1-5星)：** 
+   - 💰 财运 (Money)
+   - 💼 事业 (Career)
+   - 🌸 桃花 (Love) - *必须独立评分*
+   - 🔋 能量 (Health/Energy)
 
 Output Format (Strict JSON):
 {
-    "user_info": "您的日柱: [日柱]",
+    "user_info": "您的日柱：[日柱] ([五行])",
     "scores": {
-        "money": 4,  (1-5的整数)
-        "career_love": 3, (工作日给事业分，周末给桃花分)
-        "health": 5
+        "money": 4,
+        "career": 3,
+        "love": 5,
+        "energy": 3
     },
     "lucky_color": {
-        "main": "建议颜色",
+        "main": "建议颜色名称",
         "hex": "#颜色代码",
-        "reason": "一针见血的理由"
+        "reason": "简短的命理理由"
+    },
+    "golden_hour": {
+        "time": "未时 (13:00 - 15:00)",
+        "action": "适合做的事情 (如: 约会/谈判)"
     },
     "guide": {
-        "lucky_act": "宜：做某事 (简短)",
-        "taboo_act": "忌：做某事 (一定要具体，带点幽默或警告)",
-        "advice": "给今日的具体建议 (工作日谈职场策略，周末谈情感/生活)"
+        "lucky": "宜：具体事项 (如: 喝冰美式)",
+        "taboo": "忌：具体事项 (如: 穿绿帽子)"
     },
-    "quote": "一句扎心的毒鸡汤"
+    "advice": "一句具体的转运建议",
+    "quote": "一句神秘的玄学金句"
 }
 """
 
-# ------- 3. 辅助函数 -------
+# ------- 4. 辅助函数 -------
 def get_bazi_info(date_obj):
     solar = Solar.fromYmd(date_obj.year, date_obj.month, date_obj.day)
     lunar = solar.getLunar()
@@ -97,114 +163,140 @@ def get_bazi_info(date_obj):
     }
 
 def get_day_type(date_obj):
-    # Python中 0-4 是周一到周五，5-6 是周六周日
     weekday = date_obj.weekday()
     if weekday >= 5:
-        return "周末 (Focus: 恋爱、休息、消费)", "桃花/心情"
+        return "周末模式 (重点: 桃花/社牛/躺平)"
     else:
-        return "工作日 (Focus: 职场、效率、竞争)", "事业/学业"
+        return "工作日模式 (重点: 搞钱/防雷/效率)"
 
-# ------- 4. 界面逻辑 -------
-st.title("⚡️ 气色·能量日历")
-st.caption("Daily Energy Forecast (v1.5)")
+# ------- 5. 界面逻辑 -------
+st.title("🔮 气色·能量日历 Pro")
+st.caption("Cyber-Metaphysics Energy Guide")
 
-# 侧边栏
+# 侧边栏 (暗黑风格适配)
 with st.sidebar:
-    st.header("⚙️ 设置")
+    st.header("⚙️ 命理中枢")
     env_key = os.environ.get("GEMINI_API_KEY")
     if env_key:
         api_key = env_key
-        st.success("✅ API Key 已加载")
+        st.success("✅ 灵力链接已建立")
     else:
-        api_key = st.text_input("Gemini API Key", type="password")
+        api_key = st.text_input("输入 API Key", type="password")
 
 # 输入区
 col1, col2 = st.columns(2)
 with col1:
-    dob = st.date_input("🎂 您的生日", datetime.date(1984, 8, 25))
+    dob = st.date_input("🎂 您的生辰", datetime.date(1984, 8, 25))
 with col2:
-    today = st.date_input("📅 查看日期", datetime.date.today())
+    today = st.date_input("📅 预测日期", datetime.date.today())
 
 # 运行按钮
-if st.button("🚀 解锁今日能量"):
+if st.button("⚡️ 开启今日能量场"):
     
     if not api_key:
-        st.error("❌ 请输入 API Key")
+        st.error("❌ 灵力不足：请配置 API Key")
         st.stop()
 
     try:
-        # 1. 算八字
+        # Python 算命
         user_bazi = get_bazi_info(dob)
         today_bazi = get_bazi_info(today)
-        
-        # 2. 判断是周末还是工作日
-        day_context, score_label_2 = get_day_type(today)
+        day_context = get_day_type(today)
 
-        # 3. 调用 AI
+        # AI 算命
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash') # 既然这个能用就用这个
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
-        with st.spinner('正在下载宇宙信号...'):
+        with st.spinner('🔮 正在连接高维宇宙数据库...'):
             full_prompt = f"""
             {SYSTEM_PROMPT}
-            
-            【当前上下文 Context】
+            【用户数据】
             1. 用户日柱：{user_bazi['day_gz']} (天干: {user_bazi['day_gan']})
             2. 今日日期：{today_bazi['year_gz']}年 {today_bazi['month_gz']}月 {today_bazi['day_gz']}日
-            3. **特殊场景设定：{day_context}**
-            
-            请严格基于上述场景生成JSON。
+            3. 场景设定：{day_context}
+            请严格生成JSON。
             """
             
             response = model.generate_content(full_prompt)
-            # 清洗 JSON
             clean_json = re.sub(r"```json\s*|\s*```", "", response.text).strip()
             data = json.loads(clean_json)
 
-            # ------- 4. 结果展示 -------
-            st.balloons() # 给点氛围感
+            # ------- 结果展示 (赛博风格) -------
+            
+            # 1. 四维评分系统 (使用自定义 CSS 渲染)
+            st.markdown("### 📊 今日运势雷达")
+            c1, c2, c3, c4 = st.columns(4)
+            scores = data['scores']
+            
+            # 渲染评分小球
+            def render_score(col, label, val, icon):
+                with col:
+                    st.markdown(f"""
+                    <div class="score-container">
+                        <div style="font-size:24px;">{icon}</div>
+                        <div class="score-val">{"⚡" * val}</div>
+                        <div class="score-label">{label}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-            # 顶部：评分栏
-            st.markdown("### 📊 今日能量值")
-            s1, s2, s3 = st.columns(3)
-            with s1:
-                st.markdown(f"""<div class="score-box"><span class="score-num">{"⭐️" * data['scores']['money']}</span><span class="score-label">财运指数</span></div>""", unsafe_allow_html=True)
-            with s2:
-                st.markdown(f"""<div class="score-box"><span class="score-num">{"⭐️" * data['scores']['career_love']}</span><span class="score-label">{score_label_2}指数</span></div>""", unsafe_allow_html=True)
-            with s3:
-                st.markdown(f"""<div class="score-box"><span class="score-num">{"⭐️" * data['scores']['health']}</span><span class="score-label">身心指数</span></div>""", unsafe_allow_html=True)
+            render_score(c1, "财运", scores['money'], "💰")
+            render_score(c2, "事业", scores['career'], "💼")
+            render_score(c3, "桃花", scores['love'], "🌸") # 新增桃花
+            render_score(c4, "能量", scores['energy'], "🔋")
 
-            # 中部：幸运色卡片
-            color = data.get('lucky_color', {}).get('hex', '#333')
+            # 2. 幸运色与 OOTD (毛玻璃卡片)
+            st.markdown("<br>", unsafe_allow_html=True)
+            lucky = data['lucky_color']
             st.markdown(f"""
-            <div class="card" style="border-left: 10px solid {color}; margin-top: 20px;">
-                <h3>👕 今日OOTD：{data['lucky_color']['main']}</h3>
-                <p style="color: #666; font-size: 14px;">{data['user_info']} vs {today_bazi['day_gz']}日</p>
-                <p><i>{data['lucky_color']['reason']}</i></p>
+            <div class="glass-card">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <span style="font-size: 20px; margin-right: 10px;">👕</span>
+                    <span style="font-weight: bold; font-size: 18px;">幸运穿搭 OOTD</span>
+                </div>
+                <div class="color-box" style="background-color: {lucky['hex']}; color: {'#000' if lucky['hex'] in ['#FFFFFF', '#FFF'] else '#FFF'}">
+                    {lucky['main']}
+                </div>
+                <div style="font-size: 14px; opacity: 0.8; line-height: 1.6;">
+                    {data['user_info']} 遇上今日流日。<br>
+                    💡 {lucky['reason']}
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-            # 下部：宜忌清单 (这是重点钩子)
-            c1, c2 = st.columns(2)
-            with c1:
+            # 3. 黄金时辰 (高亮条)
+            gh = data.get('golden_hour', {'time': '未时', 'action': '摸鱼'})
+            st.markdown(f"""
+            <div class="time-bar">
+                ⏳ 黄金时辰：{gh['time']} · 宜 {gh['action']}
+            </div>
+            <br>
+            """, unsafe_allow_html=True)
+
+            # 4. 宜忌对决 (左右护法)
+            col_l, col_r = st.columns(2)
+            with col_l:
                 st.markdown(f"""
-                <div class="card" style="border-top: 5px solid #27ae60; text-align: center;">
-                    <div class="lucky">✅ 宜</div>
-                    <div style="font-size: 18px; font-weight: bold; margin-top: 10px;">{data['guide']['lucky_act']}</div>
+                <div class="glass-card action-card lucky-bg">
+                    <div class="act-title">LUCKY ACTION</div>
+                    <div class="act-content">✅ {data['guide']['lucky']}</div>
                 </div>
                 """, unsafe_allow_html=True)
-            with c2:
+            with col_r:
                 st.markdown(f"""
-                <div class="card" style="border-top: 5px solid #e74c3c; text-align: center;">
-                    <div class="taboo">🚫 忌</div>
-                    <div style="font-size: 18px; font-weight: bold; margin-top: 10px;">{data['guide']['taboo_act']}</div>
+                <div class="glass-card action-card taboo-bg">
+                    <div class="act-title">TABOO ACTION</div>
+                    <div class="act-content">🚫 {data['guide']['taboo']}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # 底部：详细建议 & 金句
-            st.info(f"💡 **{score_label_2.split('/')[0]}锦囊：** {data['guide']['advice']}")
-            st.markdown(f"<div style='text-align: center; color: #999; margin-top: 20px;'>“ {data['quote']} ”</div>", unsafe_allow_html=True)
+            # 5. 锦囊与金句
+            st.markdown(f"""
+            <div style="text-align: center; margin-top: 30px; padding: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                <p style="font-size: 16px; color: #F2C94C;">📜 <b>锦囊：</b>{data['advice']}</p>
+                <p style="font-size: 14px; color: #aaa; font-style: italic;">“ {data['quote']} ”</p>
+            </div>
+            """, unsafe_allow_html=True)
 
     except Exception as e:
-        st.error("AI 开小差了，请重试。")
-        st.error(f"Error: {e}")
+        st.error("🌌 宇宙信号干扰，请重试...")
+        st.error(f"Debug: {e}")
