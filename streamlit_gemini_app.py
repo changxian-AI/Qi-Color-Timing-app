@@ -6,10 +6,10 @@ import re
 import google.generativeai as genai
 from lunar_python import Solar
 
-# ------- 1. 页面配置 & 状态管理 -------
+# ------- 1. 页面配置 -------
 st.set_page_config(
-    page_title="气色·命运罗盘",
-    page_icon="🧿",
+    page_title="气色·命理书房",
+    page_icon="🧧",
     layout="centered"
 )
 
@@ -19,104 +19,171 @@ if 'page' not in st.session_state:
 if 'bazi_report' not in st.session_state:
     st.session_state.bazi_report = None
 
-# ------- 2. 颜值急救包 (CSS 修复) -------
+# ------- 2. 新中式 UI (水墨书卷风) -------
 st.markdown("""
 <style>
-    /* 1. 强制覆盖侧边栏和主背景，统一色调 */
-    [data-testid="stAppViewContainer"], .stApp {
-        background: radial-gradient(circle at 50% 20%, #2e1c59, #0f0c29, #000000);
-        color: #E0E0E0;
+    /* 引入外部字体 (尝试宋体风格) */
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&display=swap');
+
+    /* 全局背景：仿宣纸纹理 */
+    .stApp {
+        background-color: #F7F5F0; /* 米白 */
+        color: #2C2C2C; /* 墨黑 */
+        font-family: 'Noto Serif SC', serif;
     }
     
-    /* 2. 修复侧边栏颜色 */
+    /* 侧边栏：深木色 */
     [data-testid="stSidebar"] {
-        background-color: rgba(15, 12, 41, 0.95);
-        border-right: 1px solid rgba(255,255,255,0.1);
+        background-color: #EAE6DA;
+        border-right: 1px solid #D4Cfc0;
     }
     
-    /* 3. 输入框区域美化 (控制台风格) */
-    .input-panel {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 20px;
-        backdrop-filter: blur(10px);
+    /* 输入框优化 (水墨风) */
+    .stDateInput > label, .stTextInput > label, .stTimeInput > label {
+        color: #5D4037 !important;
+        font-weight: bold;
+    }
+    div[data-baseweb="input"] {
+        background-color: #FFF !important;
+        border: 1px solid #8D6E63 !important;
+        border-radius: 4px !important; /* 方正一点 */
     }
     
-    /* 4. 按钮特效 (更强的兼容性) */
+    /* 按钮：朱砂红印章风格 */
     div.stButton > button {
         width: 100%;
-        background: linear-gradient(45deg, #FF0080, #7928CA);
-        color: white;
-        border: none;
+        background-color: #9E2A2B; /* 朱砂红 */
+        color: #FDFBF7;
+        border: 1px solid #8A2526;
         padding: 12px 24px;
-        border-radius: 12px;
-        font-weight: bold;
+        border-radius: 6px;
+        font-family: 'Noto Serif SC', serif;
         font-size: 18px;
-        box-shadow: 0 4px 15px rgba(255, 0, 128, 0.4);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         transition: all 0.3s ease;
     }
     div.stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(255, 0, 128, 0.6);
-        color: #fff;
+        background-color: #B22222;
+        color: #FFF;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    /* 次要按钮：淡墨 */
+    .secondary-btn button {
+        background-color: transparent;
+        color: #555;
+        border: 1px solid #999;
     }
 
-    /* 5. 文字和标题优化 */
+    /* 标题样式 */
     h1 {
-        text-shadow: 0 0 20px rgba(121, 40, 202, 0.8);
-        font-weight: 800 !important;
-    }
-    
-    /* 6. 结果卡片美化 */
-    .result-card {
-        background: rgba(20, 20, 40, 0.6);
-        border-radius: 16px;
-        padding: 24px;
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-    }
-    
-    /* 7. 锦囊特效 */
-    .advice-box {
-        background: linear-gradient(135deg, #FFD700 0%, #FDB931 100%);
-        color: #333;
-        padding: 20px;
-        border-radius: 12px;
-        margin-top: 20px;
-        font-weight: bold;
-        box-shadow: 0 0 20px rgba(253, 185, 49, 0.4);
-        border: 2px solid #fff;
+        color: #3E2723;
         text-align: center;
+        font-weight: normal;
+        letter-spacing: 4px;
+        border-bottom: 2px solid #9E2A2B;
+        padding-bottom: 10px;
+        margin-bottom: 30px;
     }
+    
+    /* 卡片：书卷样式 */
+    .paper-card {
+        background-color: #FFF;
+        border: 1px solid #E0E0E0;
+        border-left: 6px solid #9E2A2B; /* 左侧红线装饰 */
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03);
+        border-radius: 4px;
+    }
+    
+    /* 日主图腾：令牌样式 */
+    .totem-box {
+        text-align: center;
+        padding: 20px;
+        border: 2px solid #333;
+        width: 120px;
+        height: 160px;
+        margin: 0 auto 20px auto;
+        background-color: #FFF;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        box-shadow: 4px 4px 0px #999;
+    }
+    .totem-char { font-size: 48px; font-weight: bold; color: #333; }
+    .totem-sub { font-size: 14px; color: #9E2A2B; margin-top: 5px; font-weight: bold; }
+    
+    /* 评分：云纹 */
+    .score-label { font-size: 12px; color: #666; margin-bottom: 5px; }
+    .score-stars { color: #D4AF37; font-size: 16px; letter-spacing: 2px; } /* 鎏金色 */
+
+    /* 宜忌框 */
+    .yi-box {
+        background-color: rgba(46, 204, 113, 0.1);
+        border: 1px solid #27ae60;
+        color: #27ae60;
+        padding: 15px;
+        text-align: center;
+        border-radius: 4px;
+    }
+    .ji-box {
+        background-color: rgba(192, 57, 43, 0.1);
+        border: 1px solid #c0392b;
+        color: #c0392b;
+        padding: 15px;
+        text-align: center;
+        border-radius: 4px;
+    }
+
+    /* 锦囊：红帖 */
+    .tips-card {
+        background-color: #FFF8E1;
+        border: 1px solid #FFECB3;
+        padding: 20px;
+        text-align: center;
+        border-radius: 8px;
+        position: relative;
+    }
+    .tips-title {
+        color: #F57F17;
+        font-weight: bold;
+        font-size: 14px;
+        letter-spacing: 2px;
+        margin-bottom: 10px;
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
-# ------- 3. 逻辑部分 (保持 v3.0 功能) -------
+# ------- 3. 逻辑部分 -------
 
-# 日报 Prompt
+# 日报 Prompt (语气调整为更沉稳)
 DAILY_PROMPT = """
-Role: 赛博命理师。
-Goal: 输出JSON，包含四维评分、幸运色、黄金时辰、宜忌、锦囊。
+Role: 传统命理国学大师。
+Goal: 输出JSON，包含四维评分、幸运色(用中国传统色名)、黄金时辰、宜忌、锦囊。
+Logic:
+1. 幸运色必须使用中国传统色名（如：靛蓝、朱红、月白、藤黄）。
+2. 语气古朴典雅，但建议要现代实用。
+
 Output Format (JSON):
 {
-    "day_master": {"gan": "甲", "element": "木", "trait": "参天大树，正直仁慈"}, 
+    "day_master": {"gan": "甲", "element": "木", "trait": "栋梁之材，仁义为本"}, 
     "scores": {"money": 4, "career": 3, "love": 5, "energy": 3},
-    "lucky_color": {"main": "色名", "hex": "#HEX", "reason": "理由"},
-    "golden_hour": {"time": "时辰", "action": "宜做之事"},
+    "lucky_color": {"main": "传统色名", "hex": "#HEX", "reason": "理由"},
+    "golden_hour": {"time": "XX时", "action": "宜做之事"},
     "guide": {"lucky": "宜...", "taboo": "忌..."},
-    "advice": "一条直击痛点的建议",
-    "quote": "玄学金句"
+    "advice": "一条指点迷津的建议",
+    "quote": "一句国学经典或禅语"
 }
 """
 
-# 深度分析 Prompt
 FULL_ANALYSIS_PROMPT = """
-Role: 宗师级命理顾问。
-Goal: 基于用户提供的出生时间（含城市），**自行推算真太阳时**，进行八字排盘和深度分析。
+Role: 隐居宗师。
+Goal: 真太阳时排盘与深度批断。
 Output Format (Markdown): 
-输出优美的Markdown报告，包含：真太阳时排盘、格局分析、性格、事业、婚姻、宗师寄语。
+请以Markdown格式输出，使用古朴的标题风格（如【命局总纲】、【性情剖析】）。
 """
 
 def get_bazi_simple(date_obj):
@@ -132,37 +199,38 @@ def switch_page(page_name):
 
 # 侧边栏
 with st.sidebar:
-    st.title("🔮 命理中枢")
+    st.markdown("### 🧧 命理书房")
     env_key = os.environ.get("GEMINI_API_KEY")
     if env_key:
         api_key = env_key
-        st.success("✅ 灵力已链接")
+        st.success("✅ 钥匙已备")
     else:
         api_key = st.text_input("输入 API Key", type="password")
     
     st.markdown("---")
-    if st.button("🏠 返回首页"):
+    st.caption("“顺势而为，方得始终。”")
+    if st.button("🏠 回到案前"):
         st.session_state.bazi_report = None
         switch_page('daily')
 
 # ================= 页面 1: 首页 (Daily) =================
 if st.session_state.page == 'daily':
-    st.markdown("# 🧿 今日能量场")
-    st.caption("Cyber-Metaphysics Energy Guide")
+    st.title("气色 · 能量日历")
     
-    # 输入控制台 (包在一个半透明容器里)
-    st.markdown('<div class="input-panel">', unsafe_allow_html=True)
+    # 输入面板
+    st.markdown('<div style="background:#FFF; padding:20px; border:1px solid #DDD; border-radius:8px;">', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        dob = st.date_input("您的生日", datetime.date(1984, 8, 25))
+        dob = st.date_input("您的生辰", datetime.date(1984, 8, 25))
     with col2:
-        today = st.date_input("预测日期", datetime.date.today())
+        today = st.date_input("今日日期", datetime.date.today())
     st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # 巨大的紫色按钮
-    if st.button("⚡️ 开启今日运势"):
+    if st.button("🎋 批算今日流年"):
         if not api_key:
-            st.error("请在左侧配置 API Key")
+            st.error("请先在侧边栏出示钥匙 (API Key)")
             st.stop()
             
         user_bazi = get_bazi_simple(dob)
@@ -172,7 +240,7 @@ if st.session_state.page == 'daily':
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-2.5-flash')
             
-            with st.spinner('🔮 正在下载宇宙信号...'):
+            with st.spinner('大师正在以此生辰入定推演...'):
                 prompt = f"""
                 {DAILY_PROMPT}
                 用户日柱：{user_bazi['full']}
@@ -182,102 +250,112 @@ if st.session_state.page == 'daily':
                 data = json.loads(response.text)
                 
                 # ---- 结果展示区 ----
-                st.markdown('<div class="result-card">', unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
                 
-                # 1. 命主图腾
+                # 1. 命主令牌
                 dm = data['day_master']
                 st.markdown(f"""
-                <div style="text-align:center; margin-bottom:20px;">
-                    <div style="font-size:48px; font-weight:bold; color:#FFF; text-shadow:0 0 20px #7928CA;">
-                        {dm['gan']} <span style="font-size:20px; opacity:0.8;">{dm['element']}命</span>
-                    </div>
-                    <div style="color:#AAA; font-size:14px;">{dm['trait']}</div>
+                <div class="totem-box">
+                    <div class="totem-char">{dm['gan']}</div>
+                    <div class="totem-sub">{dm['element']} · 命</div>
+                </div>
+                <div style="text-align:center; color:#666; font-style:italic; margin-bottom:30px;">
+                    “ {dm['trait']} ”
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # 2. 评分
-                st.markdown("### 📊 能量雷达")
+                # 2. 纸质卡片容器
+                st.markdown('<div class="paper-card">', unsafe_allow_html=True)
+                
+                # 评分
+                st.markdown("#### 📊 今日气运")
                 c1, c2, c3, c4 = st.columns(4)
                 def render_score(col, label, val):
                     col.markdown(f"""
-                    <div style="text-align:center; background:rgba(0,0,0,0.3); padding:8px; border-radius:8px;">
-                        <div style="color:#888; font-size:12px;">{label}</div>
-                        <div style="color:#FFD700; font-size:16px;">{'⚡'*val}</div>
+                    <div style="text-align:center;">
+                        <div class="score-label">{label}</div>
+                        <div class="score-stars">{'★'*val}</div>
                     </div>""", unsafe_allow_html=True)
                 
-                render_score(c1, "财运", data['scores']['money'])
-                render_score(c2, "事业", data['scores']['career'])
-                render_score(c3, "桃花", data['scores']['love'])
-                render_score(c4, "状态", data['scores']['energy'])
+                render_score(c1, "财禄", data['scores']['money'])
+                render_score(c2, "功名", data['scores']['career'])
+                render_score(c3, "姻缘", data['scores']['love'])
+                render_score(c4, "精气", data['scores']['energy'])
                 
-                # 3. 幸运色
+                st.markdown("---")
+                
+                # 幸运色
                 lucky = data['lucky_color']
                 st.markdown(f"""
-                <div style="margin-top:20px; padding:15px; border-left:5px solid {lucky['hex']}; background:rgba(255,255,255,0.05);">
-                    <b>👕 穿搭 OOTD：</b> {lucky['main']} <span style="opacity:0.6;">| {lucky['reason']}</span>
+                <div style="display:flex; align-items:center;">
+                    <div style="width:50px; height:50px; background-color:{lucky['hex']}; border-radius:50%; border:3px solid #EEE; margin-right:15px;"></div>
+                    <div>
+                        <div style="font-weight:bold; font-size:18px;">{lucky['main']}</div>
+                        <div style="color:#666; font-size:14px;">{lucky['reason']}</div>
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # 4. 黄金时辰
-                gh = data['golden_hour']
-                st.markdown(f"""
-                <div style="margin-top:10px; padding:10px; background:linear-gradient(90deg, #F2994A, #F2C94C); color:#000; border-radius:50px; text-align:center; font-weight:bold;">
-                    ⏳ {gh['time']}：{gh['action']}
-                </div>
-                """, unsafe_allow_html=True)
-
-                # 5. 宜忌
+                st.markdown("---")
+                
+                # 宜忌
                 col_l, col_r = st.columns(2)
                 with col_l:
-                     st.success(f"**宜：** {data['guide']['lucky']}")
+                     st.markdown(f"""<div class="yi-box"><b>宜</b><br>{data['guide']['lucky']}</div>""", unsafe_allow_html=True)
                 with col_r:
-                     st.error(f"**忌：** {data['guide']['taboo']}")
+                     st.markdown(f"""<div class="ji-box"><b>忌</b><br>{data['guide']['taboo']}</div>""", unsafe_allow_html=True)
+                
+                st.markdown("---")
+                
+                # 黄金时辰
+                gh = data['golden_hour']
+                st.info(f"⏳ **良辰：{gh['time']}** — {gh['action']}")
 
-                # 6. 锦囊
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # 3. 锦囊 (独立)
                 st.markdown(f"""
-                <div class="advice-box">
-                    <div>📜 锦囊</div>
-                    <div style="font-size:18px; margin-top:5px;">{data['advice']}</div>
+                <div class="tips-card">
+                    <div class="tips-title">🎐 宗师锦囊</div>
+                    <div style="font-size:18px; font-weight:bold; color:#333;">{data['advice']}</div>
+                    <div style="margin-top:15px; color:#999; font-size:12px;">{data['quote']}</div>
                 </div>
                 """, unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
                 
-                # 7. 导流按钮
+                # 4. 导流
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown("### 想要更深的答案？")
-                if st.button("🗝 解锁完整真太阳时命盘 →"):
+                st.markdown('<div class="secondary-btn">', unsafe_allow_html=True)
+                if st.button("🗝 开启真太阳时 · 终极排盘 →"):
                     switch_page('full_analysis')
+                st.markdown('</div>', unsafe_allow_html=True)
 
         except Exception as e:
-            st.error(f"连接中断: {e}")
+            st.error(f"推演中断: {e}")
 
 # ================= 页面 2: 深度分析 (Full) =================
 elif st.session_state.page == 'full_analysis':
-    st.markdown("# 🗝 命运全息解码")
-    st.caption("AI 宗师级批命 · 真太阳时校正")
+    st.title("🗝 命盘全解")
     
-    # 输入面板
-    st.markdown('<div class="input-panel">', unsafe_allow_html=True)
+    st.markdown('<div class="paper-card">', unsafe_allow_html=True)
+    st.subheader("完善出生信息")
     col1, col2 = st.columns(2)
     with col1:
         b_date = st.date_input("出生日期", datetime.date(1984, 8, 25))
     with col2:
         b_time = st.time_input("出生时间", datetime.time(12, 00))
     
-    b_city = st.text_input("出生城市 (用于经纬度排盘)", "上海")
-    st.caption("⚠️ 系统将根据城市自动推算真太阳时")
-    st.markdown('</div>', unsafe_allow_html=True)
+    b_city = st.text_input("出生城市 (用于天文校正)", "上海")
     
-    if st.button("🚀 开始深度推演"):
+    if st.button("🚀 启卦推算"):
         if not b_city or not api_key:
-            st.error("请完善信息和 API Key")
+            st.error("信息不全，无法推演")
             st.stop()
 
         try:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel('gemini-2.5-flash')
             
-            with st.spinner('正在进行天文计算与因果推演...'):
+            with st.spinner('正在校正真太阳时，排布四柱八字...'):
                 prompt = f"""
                 {FULL_ANALYSIS_PROMPT}
                 出生日期：{b_date}
@@ -289,10 +367,11 @@ elif st.session_state.page == 'full_analysis':
                 st.rerun()
 
         except Exception as e:
-            st.error(f"推演失败: {e}")
+            st.error(f"推算失败: {e}")
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # 报告展示区
     if st.session_state.bazi_report:
-        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        st.markdown('<div class="paper-card">', unsafe_allow_html=True)
         st.markdown(st.session_state.bazi_report)
         st.markdown('</div>', unsafe_allow_html=True)
